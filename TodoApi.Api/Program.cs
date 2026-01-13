@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using TodoApi.Api;
@@ -13,7 +12,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<ApplicationDbContext>(
     options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddAuthorization();
-builder.Services.AddIdentityApiEndpoints<IdentityUser>()
+builder.Services.AddIdentityApiEndpoints<ApplicationUser>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddDataProtection()
     .PersistKeysToDbContext<ApplicationDbContext>();
@@ -33,6 +32,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapIdentityApi<IdentityUser>();
+app.MapIdentityApi<ApplicationUser>();
 
 app.Run();
