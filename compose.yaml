@@ -1,4 +1,7 @@
-﻿services:
+﻿include:
+  - compose.services.yaml
+
+services:
   todo-api:
     image: todo-api
     pull_policy: never
@@ -8,15 +11,3 @@
       target: final
     ports:
       - "8080:8080"
-  
-  postgres:
-    image: postgres:18-trixie
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_PASSWORD=postgres
-    volumes:
-      - postgres-data:/var/lib/postgresql
-
-volumes:
-  postgres-data:
