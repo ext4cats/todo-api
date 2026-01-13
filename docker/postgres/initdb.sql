@@ -1,0 +1,2 @@
+﻿CREATE USER todo WITH PASSWORD 'todo';
+CREATE DATABASE todo OWNER todo;

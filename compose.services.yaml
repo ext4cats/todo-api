@@ -7,6 +7,7 @@
       - POSTGRES_PASSWORD=postgres
     volumes:
       - postgres-data:/var/lib/postgresql
+      - ./docker/postgres/initdb.sql:/docker-entrypoint-initdb.d/initdb.sql:ro
 
 volumes:
   postgres-data:
