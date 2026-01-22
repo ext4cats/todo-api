@@ -12,7 +12,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - ConnectionStrings__ApplicationDb=Host=postgres;Port=5432;Database=todo;Username=todo;Password=todo
+      - ConnectionStrings__ApplicationDb=Host=postgres;Port=5432;Database=todo;Username=todo;Password=todo;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
