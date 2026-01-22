@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using TodoApi;
@@ -11,6 +12,8 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(opt =>
 builder.Services.AddAuthorization();
 builder.Services.AddIdentityApiEndpoints<Account>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<ApplicationDbContext>();
 
 var app = builder.Build();
 
