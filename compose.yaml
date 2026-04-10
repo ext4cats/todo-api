@@ -1,0 +1,12 @@
+﻿services:
+  todo-api:
+    image: todo-api
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Todo.Api/Dockerfile
+      target: final
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
