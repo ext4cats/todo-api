@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Todo.Api.Accounts;
 
 namespace Todo.Api;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options)
-    : DbContext(options);
+    : IdentityDbContext<Account>(options);
