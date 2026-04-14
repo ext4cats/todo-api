@@ -1,4 +1,7 @@
-﻿services:
+﻿include:
+  - compose.services.yaml
+
+services:
   todo-api:
     image: todo-api
     pull_policy: never
@@ -10,3 +13,7 @@
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AppDbConnection=Host=postgres;Username=todo;Password=todo
+    depends_on:
+      postgres:
+        condition: service_healthy

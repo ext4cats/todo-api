@@ -1,6 +1,7 @@
 <Solution>
     <Folder Name="/Solution Items/">
         <File Path="compose.yaml"/>
+        <File Path="compose.services.yaml"/>
     </Folder>
     <Project Path="Todo.Api/Todo.Api.csproj"/>
 </Solution>
