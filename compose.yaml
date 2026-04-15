@@ -17,3 +17,19 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      todo-api-migrate:
+        condition: service_completed_successfully
+
+  todo-api-migrate:
+    image: todo-api-migrate
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Todo.Api/Dockerfile
+      target: migrate
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__AppDbConnection=Host=postgres;Username=todo;Password=todo
+    depends_on:
+      postgres:
+        condition: service_healthy
