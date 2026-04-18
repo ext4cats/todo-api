@@ -27,7 +27,7 @@ public class AccountController(
                 e => e.Code, e => new[] { e.Description }));
         var token = await userManager.GenerateEmailConfirmationTokenAsync(account);
         var verificationLink =
-            $"{_appOptions.BaseUrl}${_appOptions.ConfirmEmailPath}?userId={account.Id}&token={Uri.EscapeDataString(token)}";
+            $"{_appOptions.BaseUrl}{_appOptions.ConfirmEmailPath}?userId={account.Id}&token={Uri.EscapeDataString(token)}";
         await accountEmailSender.SendVerificationEmailAsync(account.Email, verificationLink);
         return TypedResults.Ok();
     }
@@ -43,12 +43,36 @@ public class AccountController(
     }
 
     [HttpPost("log-in")]
-    public async Task<Results<Ok, UnauthorizedHttpResult>> LogIn([FromBody] LogInRequest request)
+    public async Task<Results<Ok, ProblemHttpResult, UnauthorizedHttpResult>> LogIn([FromBody] LogInRequest request)
     {
         var result = await signInManager.PasswordSignInAsync(
             request.Email, request.Password, true, true);
+        if (result.IsNotAllowed)
+            return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Verification required",
+                extensions: new Dictionary<string, object?> { ["code"] = "VerificationRequired" });
+        if (result.RequiresTwoFactor)
+            return TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Second factor required",
+                extensions: new Dictionary<string, object?> { ["code"] = "SecondFactorRequired" });
         if (!result.Succeeded)
             return TypedResults.Unauthorized();
+        return TypedResults.Ok();
+    }
+
+    [HttpPost("2fa/log-in")]
+    public async Task<Results<Ok, UnauthorizedHttpResult>> LogInWithSecondFactor(
+        [FromBody] LogInWithSecondFactorRequest request)
+    {
+        var result = await signInManager.TwoFactorAuthenticatorSignInAsync(request.Code, true, request.RememberDevice);
+        if (!result.Succeeded) return TypedResults.Unauthorized();
+        return TypedResults.Ok();
+    }
+
+    [HttpPost("2fa/recovery")]
+    public async Task<Results<Ok, UnauthorizedHttpResult>> LogInWithRecoveryCode(
+        [FromBody] LogInWithRecoveryCodeRequest request)
+    {
+        var result = await signInManager.TwoFactorRecoveryCodeSignInAsync(request.Code);
+        if (!result.Succeeded) return TypedResults.Unauthorized();
         return TypedResults.Ok();
     }
 
@@ -107,7 +131,51 @@ public class AccountController(
     {
         var account = await userManager.GetUserAsync(User)
                       ?? throw new InvalidOperationException("Logged in account not found.");
-        return TypedResults.Ok(BasicInfoResponse.From(account));
+        return TypedResults.Ok(new BasicInfoResponse(account.UserName, account.Email));
+    }
+
+    [Authorize]
+    [HttpPost("2fa/start-setup")]
+    public async Task<Ok<StartTwoFactorSetupResponse>> StartTwoFactorSetup()
+    {
+        var account = await userManager.GetUserAsync(User)
+                      ?? throw new InvalidOperationException("Logged in account not found.");
+        if (account.Email is null) throw new InvalidOperationException("Account has no email.");
+        await userManager.ResetAuthenticatorKeyAsync(account);
+        var key = await userManager.GetAuthenticatorKeyAsync(account)
+                  ?? throw new InvalidOperationException("Account has no authenticator key.");
+        var uri = $"otpauth://totp/{Uri.EscapeDataString(_appOptions.AppName)}:{Uri.EscapeDataString(account.Email)}" +
+                  $"?secret={key}&issuer={Uri.EscapeDataString(_appOptions.AppName)}&algorithm=SHA1&digits=6&period=30";
+        return TypedResults.Ok(new StartTwoFactorSetupResponse(key, uri));
+    }
+
+    [Authorize]
+    [HttpPost("2fa/complete-setup")]
+    public async Task<Results<Ok<CompleteTwoFactorSetupResponse>, ValidationProblem>> CompleteTwoFactorSetup(
+        [FromBody] CompleteTwoFactorSetupRequest request)
+    {
+        var account = await userManager.GetUserAsync(User)
+                      ?? throw new InvalidOperationException("Logged in account not found.");
+        var isValid = await userManager.VerifyTwoFactorTokenAsync(account,
+            userManager.Options.Tokens.AuthenticatorTokenProvider, request.Code);
+        if (!isValid)
+            return TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                { { "code", ["Invalid or expired code."] } });
+        await userManager.SetTwoFactorEnabledAsync(account, true);
+        var recoveryCodes = await userManager.GenerateNewTwoFactorRecoveryCodesAsync(account, 10)
+                            ?? throw new InvalidOperationException("Failed to generate recovery codes.");
+        return TypedResults.Ok(new CompleteTwoFactorSetupResponse(recoveryCodes));
+    }
+
+    [Authorize]
+    [HttpPost("2fa/disable")]
+    public async Task<Ok> DisableTwoFactor()
+    {
+        var account = await userManager.GetUserAsync(User)
+                      ?? throw new InvalidOperationException("Logged in account not found.");
+        await userManager.SetTwoFactorEnabledAsync(account, false);
+        await userManager.ResetAuthenticatorKeyAsync(account);
+        return TypedResults.Ok();
     }
 }
 
@@ -117,16 +185,20 @@ public record ConfirmEmailRequest(string UserId, string Token);
 
 public record LogInRequest(string Email, string Password);
 
+public record LogInWithSecondFactorRequest(string Code, bool RememberDevice);
+
+public record LogInWithRecoveryCodeRequest(string Code);
+
 public record ForgotPasswordRequest(string Email);
 
 public record ResetPasswordRequest(string UserId, string Token, string NewPassword);
 
 public record ResendVerificationRequest(string Email);
 
-public record BasicInfoResponse(string? UserName, string? Email)
-{
-    public static BasicInfoResponse From(Account account)
-    {
-        return new BasicInfoResponse(account.UserName, account.Email);
-    }
-}
+public record CompleteTwoFactorSetupRequest(string Code);
+
+public record BasicInfoResponse(string? UserName, string? Email);
+
+public record StartTwoFactorSetupResponse(string Key, string Uri);
+
+public record CompleteTwoFactorSetupResponse(IEnumerable<string> RecoveryCodes);
