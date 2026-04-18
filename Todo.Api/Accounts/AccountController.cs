@@ -136,11 +136,15 @@ public class AccountController(
 
     [Authorize]
     [HttpPost("2fa/start-setup")]
-    public async Task<Ok<StartTwoFactorSetupResponse>> StartTwoFactorSetup()
+    public async Task<Results<Ok<StartTwoFactorSetupResponse>, ProblemHttpResult>> StartTwoFactorSetup()
     {
         var account = await userManager.GetUserAsync(User)
                       ?? throw new InvalidOperationException("Logged in account not found.");
         if (account.Email is null) throw new InvalidOperationException("Account has no email.");
+        if (await userManager.GetTwoFactorEnabledAsync(account))
+            return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict,
+                title: "Two-factor authentication is already enabled",
+                extensions: new Dictionary<string, object?> { ["code"] = "TwoFactorAlreadyEnabled" });
         await userManager.ResetAuthenticatorKeyAsync(account);
         var key = await userManager.GetAuthenticatorKeyAsync(account)
                   ?? throw new InvalidOperationException("Account has no authenticator key.");
@@ -151,11 +155,15 @@ public class AccountController(
 
     [Authorize]
     [HttpPost("2fa/complete-setup")]
-    public async Task<Results<Ok<CompleteTwoFactorSetupResponse>, ValidationProblem>> CompleteTwoFactorSetup(
-        [FromBody] CompleteTwoFactorSetupRequest request)
+    public async Task<Results<Ok<CompleteTwoFactorSetupResponse>, ProblemHttpResult, ValidationProblem>>
+        CompleteTwoFactorSetup([FromBody] CompleteTwoFactorSetupRequest request)
     {
         var account = await userManager.GetUserAsync(User)
                       ?? throw new InvalidOperationException("Logged in account not found.");
+        if (await userManager.GetTwoFactorEnabledAsync(account))
+            return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict,
+                title: "Two-factor authentication is already enabled",
+                extensions: new Dictionary<string, object?> { ["code"] = "TwoFactorAlreadyEnabled" });
         var isValid = await userManager.VerifyTwoFactorTokenAsync(account,
             userManager.Options.Tokens.AuthenticatorTokenProvider, request.Code);
         if (!isValid)
@@ -165,6 +173,17 @@ public class AccountController(
         var recoveryCodes = await userManager.GenerateNewTwoFactorRecoveryCodesAsync(account, 10)
                             ?? throw new InvalidOperationException("Failed to generate recovery codes.");
         return TypedResults.Ok(new CompleteTwoFactorSetupResponse(recoveryCodes));
+    }
+
+    [Authorize]
+    [HttpPost("2fa/reset-recovery-codes")]
+    public async Task<Ok<ResetRecoveryCodesResponse>> ResetRecoveryCodes()
+    {
+        var account = await userManager.GetUserAsync(User)
+                      ?? throw new InvalidOperationException("Logged in account not found.");
+        var recoveryCodes = await userManager.GenerateNewTwoFactorRecoveryCodesAsync(account, 10)
+                            ?? throw new InvalidOperationException("Failed to generate recovery codes.");
+        return TypedResults.Ok(new ResetRecoveryCodesResponse(recoveryCodes));
     }
 
     [Authorize]
@@ -202,3 +221,5 @@ public record BasicInfoResponse(string? UserName, string? Email);
 public record StartTwoFactorSetupResponse(string Key, string Uri);
 
 public record CompleteTwoFactorSetupResponse(IEnumerable<string> RecoveryCodes);
+
+public record ResetRecoveryCodesResponse(IEnumerable<string> RecoveryCodes);
