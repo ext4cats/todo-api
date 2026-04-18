@@ -8,6 +8,5 @@ namespace Todo.Api;
 public class AppDbContext(DbContextOptions<AppDbContext> options)
     : IdentityDbContext<Account>(options), IDataProtectionKeyContext
 {
-    public DbSet<Account> Accounts { get; set; }
     public DbSet<DataProtectionKey> DataProtectionKeys { get; set; }
 }
