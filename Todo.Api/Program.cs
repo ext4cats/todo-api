@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Todo.Api;
@@ -11,11 +12,15 @@ builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddDbContextPool<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("AppDbConnection")));
-builder.Services.AddAuthorization();
-builder.Services.AddIdentityApiEndpoints<Account>()
-    .AddEntityFrameworkStores<AppDbContext>();
 builder.Services.AddDataProtection()
     .PersistKeysToDbContext<AppDbContext>();
+builder.Services.AddIdentityCore<Account>()
+    .AddEntityFrameworkStores<AppDbContext>()
+    .AddSignInManager()
+    .AddDefaultTokenProviders();
+builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
+    .AddIdentityCookies();
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -27,7 +32,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-app.MapIdentityApi<Account>();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
