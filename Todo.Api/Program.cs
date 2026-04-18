@@ -14,13 +14,17 @@ builder.Services.AddDbContextPool<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("AppDbConnection")));
 builder.Services.AddDataProtection()
     .PersistKeysToDbContext<AppDbContext>();
-builder.Services.AddIdentityCore<Account>()
+builder.Services.AddIdentityCore<Account>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<AppDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
 builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     .AddIdentityCookies();
 builder.Services.AddAuthorization();
+builder.Services.AddAccountEmailSender(builder.Configuration);
+builder.Services.AddOptions<AppOptions>()
+    .BindConfiguration("App")
+    .ValidateOnStart();
 
 var app = builder.Build();
 
